@@ -1,7 +1,7 @@
 UnityGraphicsProgramming vol.2
 =====================
 
-[IndieVisualLab](https://IndieVisualLab.github.io)によるUnity技術の同人誌[「UnityGraphicsProgramming vol.2」](https://indievisuallab.stores.jp/items/59edf11ac8f22c0152002588)のリポジトリ
+[IndieVisualLab](https://IndieVisualLab.github.io)によるUnity技術の同人誌「UnityGraphicsProgramming vol.2」のリポジトリ
 
 - 第1章 Real-Time GPU Based Voxelizer [@mattatz](https://github.com/mattatz) - [サンプルコード](https://github.com/IndieVisualLab/UnityGraphicsProgramming2/tree/master/Assets/RealTimeGPUBasedVoxelizer)
 - 第2章 GPU-Based Trail [@fuqunaga](https://github.com/fuqunaga) - [サンプルコード](https://github.com/IndieVisualLab/UnityGraphicsProgramming2/tree/master/Assets/GPUBasedTrails)
