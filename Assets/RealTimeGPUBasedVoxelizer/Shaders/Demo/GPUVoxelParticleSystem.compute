@@ -1,0 +1,88 @@
+﻿
+#pragma kernel Setup
+#pragma kernel Update
+
+#define THREAD [numthreads(8, 1, 1)]
+#define DISCARD_OVERFLOW if (id.x >= _ParticleCount) return;
+
+#include "../Voxel.cginc"
+#include "Random.cginc"
+#include "Quaternion.cginc"
+#include "VoxelParticle.cginc"
+
+int _Width, _Height, _Depth;
+
+StructuredBuffer<Voxel> _VoxelBuffer;
+uint _VoxelCount;
+
+RWStructuredBuffer<VoxelParticle> _ParticleBuffer;
+uint _ParticleCount;
+
+float2 _Speed; // min, max
+float2 _DT;
+float3 _Gravity;
+float _Decay;
+
+THREAD
+void Setup(uint3 id : SV_DispatchThreadID)
+{
+    DISCARD_OVERFLOW
+
+    Voxel v = _VoxelBuffer[id.x];
+    VoxelParticle particle;
+    particle.position = v.position;
+    particle.rotation = QUATERNION_IDENTITY;
+    particle.scale = float3(1, 1, 1) * (float) v.fill;
+    particle.size = 0;
+    particle.velocity = float3(0, 0, 0);
+    particle.speed = lerp(_Speed.x, _Speed.y, nrand(id.xy));
+    particle.lifetime = nrand(id.yx);
+    _ParticleBuffer[id.x] = particle;
+}
+
+Voxel GetVoxel(uint id)
+{
+    if (id >= (uint) _VoxelCount)
+    {
+        Voxel v;
+        v.position = float3(0, 0, 0);
+        v.fill = false;
+        return v;
+    }
+    return _VoxelBuffer[id.x];
+}
+
+THREAD
+void Update(uint3 id : SV_DispatchThreadID)
+{
+    DISCARD_OVERFLOW
+
+    Voxel v = GetVoxel(id.x);
+    VoxelParticle particle = _ParticleBuffer[id.x];
+
+    float3 pos = particle.position.xyz;
+    float4 rot = particle.rotation.xyzw;
+    float3 vel = particle.velocity.xyz;
+    float lifetime = particle.lifetime - particle.speed * _DT.x;
+
+    float flag = step(lifetime, 0) * (float) v.fill;
+    lifetime = saturate(lifetime);
+    float scale = smoothstep(0, 0.5, lifetime);
+
+    float m = length(vel.xyz);
+    rot = qmul(rot, rotate_angle_axis(m, random_point_on_sphere(id.xy)));
+
+    vel.xyz += _Gravity * particle.speed;
+    vel.xyz *= _Decay;
+    pos -= vel.xyz * _DT.x;
+
+    particle.position.xyz = lerp(pos, v.position.xyz, flag);
+    particle.rotation.xyzw = lerp(rot, QUATERNION_IDENTITY, flag);
+    particle.velocity.xyz = lerp(vel, float3(0, 0, 0), flag);
+    particle.size = lerp(particle.size, (float) v.fill, flag);
+    particle.scale = float3(1, 1, 1) * particle.size * scale;
+
+    particle.lifetime = lerp(lifetime, 1, flag);
+
+    _ParticleBuffer[id.x] = particle;
+}

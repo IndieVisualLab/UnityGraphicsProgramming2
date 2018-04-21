@@ -1,0 +1,97 @@
+﻿#pragma kernel Emit
+#pragma kernel Iterator
+
+#define THREAD_X 128
+#define THREAD_Y 1
+#define THREAD_Z 1
+#define EPSILON 1e-3
+
+struct Params
+{
+    float3 emitPos;
+    float3 position;
+    float4 velocity; //xyz = velocity, w = velocity coef
+    float3 life;     // x = time elapsed, y = life time, z = isActive 1 is active, -1 is disactive
+    float3 size;     // x = current size, y = start size, z = target size.
+    float4 color;
+    float4 startColor;
+    float4 endColor;
+};
+            
+#include "../Shaders/SimplexNoise3D.cginc"
+
+RWStructuredBuffer<Params> buf;
+
+float2 times; //x = delta time, y = time since start
+float3 additionalVector;
+float  convergence;
+float  viscosity;
+
+float rand(float3 co)
+{
+    return frac(sin(dot(co.xyz, float3(12.9898, 78.233, 45.5432))) * 43758.5453);
+}
+
+float3 curlNoise(float3 coord)
+{
+    float3 dx = float3(EPSILON, 0.0, 0.0);
+    float3 dy = float3(0.0, EPSILON, 0.0);
+    float3 dz = float3(0.0, 0.0, EPSILON);
+
+    float3 dpdx0 = simplexNoise(coord - dx);
+    float3 dpdx1 = simplexNoise(coord + dx);
+    float3 dpdy0 = simplexNoise(coord - dy);
+    float3 dpdy1 = simplexNoise(coord + dy);
+    float3 dpdz0 = simplexNoise(coord - dz);
+    float3 dpdz1 = simplexNoise(coord + dz);
+
+    float x = dpdy1.z - dpdy0.z + dpdz1.y - dpdz0.y;
+    float y = dpdz1.x - dpdz0.x + dpdx1.z - dpdx0.z;
+    float z = dpdx1.y - dpdx0.y + dpdy1.x - dpdy0.x;
+
+    return float3(x, y, z) / EPSILON * 2.0;
+}
+			
+float rand(float2 co)
+{
+    return frac(sin(dot(co.xy, float2(12.9898, 78.233))) * 43758.5453);
+}
+
+[numthreads(THREAD_X, THREAD_Y, THREAD_Z)]
+void Emit(uint id : SV_DispatchThreadID)
+{
+    Params p = buf[id];
+    if (p.life.z == -1)
+    {
+        p.life = float3(0.0, p.life.y, 1.0);
+        p.position = p.emitPos * saturate(times.y * 0.3);
+        p.size.x = p.size.y;
+        p.color = p.startColor;
+    }
+    buf[id] = p;
+}
+
+[numthreads(THREAD_X, THREAD_Y, THREAD_Z)]
+void Iterator(uint id : SV_DispatchThreadID)
+{
+    Params p = buf[id];
+                
+    if (p.life.z == 1.0)
+    {
+        p.life.x += times.x;
+        if (p.life.x > p.life.y)
+        {
+            p.life.z = -1.0;
+        }
+        else
+        {
+            float3 force = curlNoise(p.position * times.x * convergence) - p.velocity.xyz;
+            p.velocity.xyz += (force + additionalVector) * times.x * viscosity * saturate(times.y * 0.5);
+            p.position += p.velocity.xyz * times.x;
+
+            p.size.x = lerp(p.size.y, p.size.z, saturate(p.life.x / p.life.y)) * saturate(times.y * 0.1);
+            p.color = lerp(p.startColor, p.endColor, saturate(p.life.x / p.life.y)) * saturate(times.y);
+        }
+    }
+    buf[id] = p;
+}

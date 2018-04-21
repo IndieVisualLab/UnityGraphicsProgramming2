@@ -1,0 +1,27 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel Update
+
+#include "../Shaders/OctahedronSphereData.cginc"
+#include "../Shaders/Libs/Noise.cginc"
+
+#define THREAD_GROUP_X 8
+
+RWStructuredBuffer<OctahedronSphereData> _particleBuffer;
+
+float _Time;
+float _NoiseScale;
+float _NoiseSpeed;
+int _SubDivisionNum;
+
+[numthreads(THREAD_GROUP_X,1,1)]
+void Update(uint3 id : SV_DispatchThreadID)
+{
+	// TODO: insert actual code here!
+	uint idx = id.x;
+
+	float3 pos = _particleBuffer[idx].position * _NoiseScale;
+
+	//_particleBuffer[idx].level = clamp(ceil(abs(snoise(float2(_Time, idx * 3.0)) * 3.0)), 1, 3);
+	_particleBuffer[idx].level = clamp(ceil(abs(snoise(pos + float3(_Time, _Time, _Time) * _NoiseSpeed) * (float)_SubDivisionNum)), 1, _SubDivisionNum);
+
+}

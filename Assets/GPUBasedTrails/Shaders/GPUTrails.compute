@@ -1,0 +1,62 @@
+﻿#pragma kernel CalcInput
+
+#include "GPUTrails.cginc"
+
+float _Time;
+float _UpdateDistanceMin;
+uint _TrailNum;
+
+RWStructuredBuffer<Trail> _TrailBuffer;
+RWStructuredBuffer<Node> _NodeBuffer;
+
+Node GetNode(int trailIdx, int nodeIdx)
+{
+	return _NodeBuffer[ToNodeBufIdx(trailIdx, nodeIdx)];
+}
+
+void SetNode(Node node, int trailIdx, int nodeIdx)
+{
+	_NodeBuffer[ToNodeBufIdx(trailIdx, nodeIdx)] = node;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Input
+////////////////////////////////////////////////////////////////////////////////
+StructuredBuffer<Input> _InputBuffer;
+
+[numthreads(256,1,1)]
+void CalcInput (uint3 id : SV_DispatchThreadID)
+{
+	uint trailIdx = id.x;
+	if ( trailIdx < _TrailNum)
+	{	
+		Trail trail = _TrailBuffer[trailIdx];
+		Input input = _InputBuffer[trailIdx];
+		int currentNodeIdx = trail.currentNodeIdx;
+
+		bool update = true;
+		if ( trail.currentNodeIdx >= 0 )
+		{
+			Node node = GetNode(trailIdx, currentNodeIdx);
+			float dist = distance(input.position, node.position);
+			update = dist > _UpdateDistanceMin;
+		}
+
+		if ( update )
+		{
+			Node node;
+			node.time = _Time;
+			node.position = input.position;
+
+			currentNodeIdx++;
+			currentNodeIdx %= _NodeNumPerTrail;
+
+			// write new node
+			SetNode(node, trailIdx, currentNodeIdx);
+
+			// update trail
+			trail.currentNodeIdx = currentNodeIdx;
+			_TrailBuffer[trailIdx] = trail;
+		}
+	}
+}
