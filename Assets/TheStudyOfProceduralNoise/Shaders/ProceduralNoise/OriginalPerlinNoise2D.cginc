@@ -55,7 +55,7 @@ float originalPerlinNoise(float2 v)
 	// 補間
 	float2 u_xy = interpolate(f.xy);
 	float2 n_x  = lerp(float2(n00, n01), float2(n10, n11), u_xy.x);
-	float2 n_xy = lerp(n_x.x, n_x.y, u_xy.y);
+	float n_xy = lerp(n_x.x, n_x.y, u_xy.y);
 	return n_xy;
 }
 #endif
